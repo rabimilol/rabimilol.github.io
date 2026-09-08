@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>PayloadDisplayName</key>
-    <string>Shiga DNS</string>
+    <string>Tokyo DNS</string>
     <key>PayloadIdentifier</key>
     <string>com.rabimi.dns.profile</string>
     <key>PayloadUUID</key>
@@ -25,7 +25,7 @@
             <key>PayloadUUID</key>
             <string>F9E8D7C6-B5A4-3210-FEDC-BA9876543210</string> 
             <key>PayloadDisplayName</key>
-            <string>DNS Settings</string>
+            <string>TokyoDNS🇯🇵</string>
         
             <key>DNSSettings</key>
             <dict>
@@ -39,12 +39,12 @@
                 
                 <!-- DoHのURLポインタ -->
                 <key>ServerURL</key>
-                <string>https://dynamic-27-121-223-185.gol.ne.jp</string>
+                <string>https://p7001164-ipoefx.ipoe.ocn.ne.jp</string>
                 
                 <!-- 問い合わせ先IPアドレスのリスト -->
                 <key>ServerAddresses</key>
                 <array>
-                    <string>27.121.223.185</string>
+                    <string>118.3.227.163</string>
                 </array>
             </dict>
         </dict>
