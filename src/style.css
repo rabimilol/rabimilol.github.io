@@ -1,6 +1,42 @@
-html{
-  text-align: center;
+@charset "utf-8";
+
+body {
+  font-family: 'M PLUS Rounded 1c', 'M PLUS 1p', sans-serif; /* フォント名に合わせ適宜調整してください */
+  background-color: #f7f9fb;
+  color: #333333;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  gap: 20px;
+  padding: 20px;
 }
-h1{
-  color:blue
+
+div {
+  width: 100%;
+  max-width: 400px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+div a {
+  display: block;
+  padding: 24px;
+  text-align: center;
+  text-decoration: none;
+}
+
+div h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2c3e50;
+  letter-spacing: 0.05em;
 }
