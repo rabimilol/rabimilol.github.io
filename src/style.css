@@ -20,6 +20,8 @@ div {
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex: 1;
+  min-height: 100vh
 }
 
 div:hover {
@@ -43,4 +45,8 @@ div h1 {
 
 footer{
   font-size: 16px;
+  background-color: #333;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
 }
