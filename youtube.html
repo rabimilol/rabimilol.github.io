@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HerTube</title>
+    <link rel="stylesheet" href="src/youtube.css">
+</head>
+<body>
+    <header>
+        <h1>My YouTube Viewer</h1>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="キーワードを入力...">
+            <button id="search-button">検索</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- 動画プレイヤーエリア -->
+        <div class="player-container">
+            <div id="player">
+                <p class="placeholder-text">動画を選択してください</p>
+            </div>
+        </div>
+
+        <!-- 検索結果・動画一覧エリア -->
+        <div class="results-container" id="results"></div>
+    </main>
+
+    <!-- YouTube IFrame Player API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="script.js"></script>
+</body>
+</html>
