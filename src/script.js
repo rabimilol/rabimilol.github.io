@@ -27,15 +27,12 @@ async function searchVideos(query) {
     const resultsContainer = document.getElementById('results');
     resultsContainer.innerHTML = '<p class="placeholder-text" style="padding: 1rem;">検索中...</p>';
 
-    // 安定しているPipedの公開APIエンドポイント
-    const endpoint = `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`;
+    // ★ Cloudflare Tunnelで発行されたURLに変更
+    const tunnelUrl = 'https://buy-actual-useful-anyway.trycloudflare.com';
+    const endpoint = `${tunnelUrl}/api/search?q=${encodeURIComponent(query)}`;
 
     try {
         const response = await fetch(endpoint);
-        if (!response.ok) {
-            throw new Error('ネットワーク応答が正しくありません');
-        }
-        
         const data = await response.json();
 
         if (data.items && data.items.length > 0) {
@@ -45,10 +42,10 @@ async function searchVideos(query) {
         }
     } catch (error) {
         console.error('通信エラー:', error);
-        alert('APIの通信に失敗しました。時間をおいて再試行してください。');
-        resultsContainer.innerHTML = '<p class="placeholder-text" style="padding: 1rem;">エラーが発生しました。</p>';
+        alert('サーバーとの通信に失敗しました。');
     }
 }
+
 
 // 検索結果を画面に描画する関数
 function displayResults(items) {
