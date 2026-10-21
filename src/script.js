@@ -1,9 +1,14 @@
-// Invidiousのパブリックインスタンス（サーバー）を利用
-const API_BASE = 'https://invidious.nerdvpn.de/api/v1';
+// 利用可能な Invidious パブリックインスタンスのリスト（予備を複数保持）
+const INSTANCES = [
+    'https://invidious.nerdvpn.de',
+    'https://invidious.tiekoetter.com',
+    'https://yt.chocolatemoo53.com',
+    'https://invidious.f5.si'
+];
 
 let player;
 
-// プレイヤーの初期化（YouTube IFrame Player APIを使用）
+// YouTube IFrame Player API の準備完了
 function onYouTubeIframeAPIReady() {
     // 準備完了
 }
@@ -24,24 +29,42 @@ function playVideo(videoId) {
     }
 }
 
-// 検索を実行する関数（APIキー不要）
+// 稼働しているサーバーを順番に試しながら検索を実行する関数
 async function searchVideos(query) {
     if (!query) return;
 
-    const endpoint = `${API_BASE}/search?q=${encodeURIComponent(query)}&type=video`;
+    const resultsContainer = document.getElementById('results');
+    resultsContainer.innerHTML = '<p class="placeholder-text">検索中...</p>';
 
-    try {
-        const response = await fetch(endpoint);
-        const data = await response.json();
+    let success = false;
 
-        if (Array.isArray(data)) {
-            displayResults(data);
-        } else {
-            alert('検索結果の取得に失敗しました。');
+    for (const baseUrl of INSTANCES) {
+        const endpoint = `${baseUrl}/api/v1/search?q=${encodeURIComponent(query)}&type=video`;
+
+        try {
+            // 5秒でタイムアウトするように設定
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(endpoint, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    displayResults(data);
+                    success = true;
+                    break; // 成功したらループを抜ける
+                }
+            }
+        } catch (error) {
+            console.warn(`サーバー ${baseUrl} での検索に失敗しました。次のサーバーを試します...`);
         }
-    } catch (error) {
-        console.error('通信エラー:', error);
-        alert('APIとの通信に失敗しました。時間をおいて再試行してください。');
+    }
+
+    if (!success) {
+        resultsContainer.innerHTML = '';
+        alert('現在利用できるサーバーがありません。時間をおいて再試行するか、Piped APIへの切り替えをご検討ください。');
     }
 }
 
@@ -54,8 +77,13 @@ function displayResults(items) {
         const videoId = item.videoId;
         const title = item.title;
         const channelTitle = item.author;
-        // サムネイル画像
-        const thumbnail = item.videoThumbnails ? item.videoThumbnails.find(t => t.quality === 'medium')?.url || item.videoThumbnails[0]?.url : '';
+        
+        // サムネイル画像の取得（中画質があればそれを優先）
+        let thumbnail = '';
+        if (item.videoThumbnails && item.videoThumbnails.length > 0) {
+            const mediumThumb = item.videoThumbnails.find(t => t.quality === 'medium');
+            thumbnail = mediumThumb ? mediumThumb.url : item.videoThumbnails[0].url;
+        }
 
         const card = document.createElement('div');
         card.className = 'video-card';
