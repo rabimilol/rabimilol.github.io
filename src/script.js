@@ -27,7 +27,6 @@ async function searchVideos(query) {
     const resultsContainer = document.getElementById('results');
     resultsContainer.innerHTML = '<p class="placeholder-text" style="padding: 1rem;">検索中...</p>';
 
-    // ★ Cloudflare Tunnelで発行されたURLに変更
     const tunnelUrl = 'https://symbol-chance-latitude-choose.trycloudflare.com';
     const endpoint = `${tunnelUrl}/api/search?q=${encodeURIComponent(query)}`;
 
