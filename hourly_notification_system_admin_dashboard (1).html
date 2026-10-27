@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時報通知管理システム - Hourly Notifier Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(75, 85, 99, 0.5);
+        }
+        /* グラスモフィズム効果 */
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200 min-h-screen">
+
+    <!-- トースト通知コンテナ -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+    <!-- パスワード認証ダイアログ（ログイン保護） -->
+    <div id="auth-modal" class="fixed inset-0 z-40 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-8 relative overflow-hidden">
+            <div class="absolute -top-12 -right-12 w-32 h-32 bg-brand-500/20 rounded-full blur-2xl"></div>
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-brand-500/10 dark:bg-brand-500/20 text-brand-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-brand-500/30">
+                    <i data-lucide="lock" class="w-8 h-8"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">管理者ログイン</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">iPad管理Webダッシュボードアクセス保護</p>
+            </div>
+
+            <form id="auth-form" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">パスワード</label>
+                    <div class="relative">
+                        <input type="password" id="auth-password" required placeholder="••••••••" 
+                            class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 transition">
+                        <button type="button" onclick="togglePasswordVisibility('auth-password', 'eye-icon-auth')" class="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <i id="eye-icon-auth" data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-3.5 px-4 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/30 transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <i data-lucide="key-round" class="w-5 h-5"></i>
+                    <span>ダッシュボードを開く</span>
+                </button>
+                <div id="auth-error" class="hidden text-red-500 text-xs text-center font-medium">
+                    パスワードが違います (初期設定: admin123)
+                </div>
+            </form>
+            <div class="mt-6 text-center">
+                <span class="text-xs text-slate-400">初期パスワード: <code class="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-brand-500 font-mono">admin123</code></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインダッシュボード -->
+    <div id="main-dashboard" class="hidden min-h-screen flex flex-col md:flex-row">
+
+        <!-- サイドバー (iPad / 大画面向け) -->
+        <aside class="w-full md:w-64 glass border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 p-4 flex md:flex-col justify-between shrink-0 sticky top-0 z-20">
+            <div class="space-y-6 w-full">
+                <!-- ロゴ & タイトル -->
+                <div class="flex items-center gap-3 px-2">
+                    <div class="w-10 h-10 bg-brand-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-brand-500/20 shrink-0">
+                        <i data-lucide="bell-ring" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-base font-bold leading-tight">時報Notifier</h1>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">iPad Admin Console</p>
+                    </div>
+                </div>
+
+                <!-- ナビゲーションメニュー -->
+                <nav class="hidden md:flex flex-col gap-1">
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn active flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                        <span>ダッシュボード</span>
+                    </button>
+                    <button onclick="switchTab('guide')" id="nav-guide" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        <i data-lucide="smartphone" class="w-4 h-4"></i>
+                        <span>Android / APK 連携手順</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- サイドバーフッター（設定・ユーザー） -->
+            <div class="flex md:flex-col items-center gap-2 pt-0 md:pt-4 border-t-0 md:border-t border-slate-200 dark:border-slate-800 w-full">
+                <div class="hidden md:flex items-center justify-between w-full px-2 mb-2">
+                    <span class="text-[11px] text-slate-400 font-medium">ステータス</span>
+                    <span id="system-status-pill" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-semibold border border-emerald-500/20">稼働中</span>
+                </div>
+                <div class="flex items-center justify-between w-full gap-2">
+                    <button onclick="toggleDarkMode()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="ダークモード切り替え">
+                        <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+                        <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                    </button>
+                    <button onclick="openPasswordResetModal()" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="パスワード変更">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="logout()" class="p-2.5 rounded-xl bg-red-500/10 text-red-600 hover:bg-red-500/20 transition" title="ログアウト">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- メインコンテンツエリア -->
+        <div class="flex-1 overflow-y-auto">
+            
+            <!-- タブ1: ダッシュボードメイン画面 -->
+            <main id="tab-dashboard" class="p-4 md:p-6 lg:p-8 max-w-[1500px] mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- 左/中央カラム: 設定・スケジュール (7 cols) -->
+                <div class="lg:col-span-7 space-y-6">
+
+                    <!-- カード1: メインマスターコントロール & 通知権限 -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                                <span class="text-xs font-semibold uppercase tracking-wider text-brand-500">マスターコントロール</span>
+                                <h2 class="text-xl font-bold mt-0.5">1時間毎の自動通知</h2>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">毎時00分に対象のスマホへ通知メッセージを送信します</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="master-toggle" onchange="toggleMasterNotify(this.checked)" class="sr-only peer" checked>
+                                <div class="w-14 h-8 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Web Push Notifications リクエスト領域 -->
+                        <div class="mt-6 p-4 rounded-2xl bg-brand-50 dark:bg-slate-800/60 border border-brand-200 dark:border-brand-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2.5 bg-brand-500 text-white rounded-xl shadow-sm">
+                                    <i data-lucide="smartphone" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xs font-bold">Web通知を有効化（Xperia / 各端末）</h3>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">端末ポップアップで通知を受信するための権限を許可します</p>
+                                </div>
+                            </div>
+                            <button onclick="requestNotificationPermission()" id="btn-request-permission" class="w-full sm:w-auto px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-xl shadow transition flex items-center justify-center gap-1.5 shrink-0">
+                                <i data-lucide="bell" class="w-4 h-4"></i>
+                                <span>通知許可リクエスト</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- カード2: スケジュール & 時間設定 -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <i data-lucide="clock" class="w-5 h-5 text-brand-500"></i>
+                                <h2 class="text-base font-bold">配信スケジュール設定</h2>
+                            </div>
+                            <button onclick="saveScheduleSettings()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                <span>設定を保存</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">配信開始時間</label>
+                                <input type="time" id="schedule-start" value="09:00" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">配信終了時間</label>
+                                <input type="time" id="schedule-end" value="21:00" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                            </div>
+                        </div>
+
+                        <!-- 曜日選択 -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">通知を有効にする曜日</label>
+                            <div class="flex flex-wrap gap-2" id="days-selector">
+                                <!-- JSで動的レンダリング -->
+                            </div>
+                        </div>
+
+                        <!-- ナイトモード / 静音トグル -->
+                        <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-semibold">夜間サイレントモード</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">22:00 〜 07:00 は音なしで通知のみ送信</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="quiet-hours-toggle" class="sr-only peer" checked>
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- カード3: メッセージ作成 & 即時テスト送信 -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm space-y-5">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="message-square" class="w-5 h-5 text-brand-500"></i>
+                            <h2 class="text-base font-bold">通知メッセージカスタマイズ</h2>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">通知タイトル</label>
+                                <input type="text" id="msg-title" value="【時報】{time} のお知らせ" oninput="updatePhonePreview()" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">本文メッセージ (使える変数: {time}, {date})</label>
+                                <textarea id="msg-body" rows="3" oninput="updatePhonePreview()" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium resize-none">現在 {time} です。適度な水分補給や姿勢チェックを行いましょう！</textarea>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">通知サウンド効果</label>
+                                    <select id="sound-select" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                                        <option value="chime">チャイム（標準）</option>
+                                        <option value="digital">デジタルビープ</option>
+                                        <option value="soft">ソフトベル</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">カテゴリータグ</label>
+                                    <select id="category-select" onchange="updatePhonePreview()" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                                        <option value="健康・リフレッシュ">健康・リフレッシュ</option>
+                                        <option value="タスクリマインダー">タスクリマインダー</option>
+                                        <option value="マインドフルネス">マインドフルネス</option>
+                                        <option value="システム通知">システム通知</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 即時テスト送信ボタン -->
+                        <div class="pt-2 flex gap-3">
+                            <button onclick="triggerImmediateNotification()" class="flex-1 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/20 transition flex items-center justify-center gap-2 text-xs">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                                <span>今すぐテスト通知を送信（サウンド試聴付き）</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 右カラム: Xperia風スマホシミュレータ & ログ (5 cols) -->
+                <div class="lg:col-span-5 space-y-6">
+
+                    <!-- Xperia (Ace III) スマホシミュレータ -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col items-center">
+                        <div class="w-full flex items-center justify-between mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">スマホ表示プレビュー</span>
+                            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono">Xperia Ace III Style</span>
+                        </div>
+
+                        <!-- Mobile Frame (Compact Aspect) -->
+                        <div class="w-full max-w-[280px] h-[500px] bg-slate-950 rounded-[40px] p-3 shadow-2xl border-4 border-slate-800 relative flex flex-col justify-between overflow-hidden">
+                            <!-- Notch / Front Camera -->
+                            <div class="absolute top-3 left-1/2 -translate-x-1/2 w-16 h-3 bg-black rounded-full z-20 flex items-center justify-center">
+                                <div class="w-2 h-2 rounded-full bg-slate-900"></div>
+                            </div>
+
+                            <!-- Lock Screen Clock -->
+                            <div class="pt-8 text-center text-white z-10">
+                                <div id="preview-phone-time" class="text-5xl font-extralight tracking-tight font-mono">14:00</div>
+                                <div id="preview-phone-date" class="text-xs text-slate-300 font-light mt-1">10月27日 火曜日</div>
+                            </div>
+
+                            <!-- Notification Card -->
+                            <div class="my-auto z-10 px-1 space-y-2">
+                                <div id="preview-notification-card" class="bg-slate-900/90 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-700/60 shadow-xl transition-all duration-300">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <div class="flex items-center gap-1.5">
+                                            <div class="w-4 h-4 bg-brand-500 rounded flex items-center justify-center text-[10px] font-bold">時</div>
+                                            <span class="text-[10px] font-semibold text-slate-300 tracking-wide">時報Notifier</span>
+                                        </div>
+                                        <span class="text-[9px] text-slate-400">たった今</span>
+                                    </div>
+                                    <h4 id="preview-title-text" class="text-xs font-bold text-white">【時報】14:00 のお知らせ</h4>
+                                    <p id="preview-body-text" class="text-[11px] text-slate-300 mt-1 leading-snug">現在 14:00 です。適度な水分補給や姿勢チェックを行いましょう！</p>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <span id="preview-category-tag" class="text-[9px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 font-medium border border-brand-500/30">健康・リフレッシュ</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Android Navigation Bar -->
+                            <div class="w-24 h-1 bg-slate-500 rounded-full mx-auto mb-1 z-10"></div>
+
+                            <!-- Subtle Ambient Background -->
+                            <div class="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950"></div>
+                        </div>
+                    </div>
+
+                    <!-- 履歴ログ -->
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col h-[300px]">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="history" class="w-4 h-4 text-brand-500"></i>
+                                <h2 class="text-xs font-bold">通知送信履歴</h2>
+                            </div>
+                            <button onclick="clearNotificationLogs()" class="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">ログ消去</button>
+                        </div>
+
+                        <div id="logs-container" class="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                            <!-- JSで動的に追加 -->
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+
+            <!-- タブ2: Android 14 (Xperia Ace III) & Native APK ガイド画面 -->
+            <section id="tab-guide" class="hidden p-4 md:p-6 lg:p-8 max-w-[1200px] mx-auto space-y-6">
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-sm">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl border border-emerald-500/20">
+                            <i data-lucide="smartphone" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold">Android 14 (Xperia Ace III) & APK アプリ化 ガイド</h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">実機で確実に1時間毎の通知を受け取るための設定手順</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- ステップ1: Web/PWAとして使用する場合 -->
+                        <div class="space-y-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center">1</span>
+                                <h3 class="font-bold text-sm">Chromeブラウザ / PWA で通知を受信する</h3>
+                            </div>
+                            <ul class="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 list-disc pl-5">
+                                <li><strong>Android14の通知権限許可:</strong> Xperia Ace IIIのChromeで本ページを開き、上部の「通知許可リクエスト」を押してポップアップを許可します。</li>
+                                <li><strong>ホーム画面に追加 (PWA化):</strong> Chromeメニュー（右上3点）から「ホーム画面に追加」を選択すると、通常のアプリと同じように起動できます。</li>
+                                <li><strong>バッテリー最適化の解除 (重要):</strong> Android 14 の設定 → 「アプリ」 → 「Chrome」または本アプリ → 「バッテリー」 → <strong>「制限なし (Unrestricted)」</strong> に変更してください。（省電力でバックグラウンド実行が停止するのを防止します）</li>
+                            </ul>
+                        </div>
+
+                        <!-- ステップ2: APK Native App (Gradle/Android Studio) 化する場合 -->
+                        <div class="space-y-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-brand-600 text-white font-bold text-xs flex items-center justify-center">2</span>
+                                <h3 class="font-bold text-sm">既存の Gradle 環境で APK化する手順</h3>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">すでにAndroid Studio環境（gradlew）をお持ちの場合、以下の方法で即座にAPKへ組み込めます：</p>
+                            <ul class="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-disc pl-5">
+                                <li><strong>WebView組み込み:</strong> `MainActivity.kt` の `WebView` に本HTMLを読み込ませるだけでそのままアプリ化できます。</li>
+                                <li><strong>TWA (Trusted Web Activity):</strong> Bubblewrap CLI 等を利用すると、本WebサイトをそのままビルドしてAPKを作成できます。</li>
+                                <li><strong>バックグラウンド1時間通知 (WorkManager):</strong> Android Nativeで完全なバックグラウンド通知を行う場合、`WorkManager` の `PeriodicWorkRequest` を1時間周期 (`1, TimeUnit.HOURS`) でセットします。</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Gradle コード例 -->
+                    <div class="mt-6 p-4 rounded-2xl bg-slate-900 text-slate-200 font-mono text-xs overflow-x-auto space-y-2">
+                        <div class="text-slate-400 mb-1">// Android Studio (Gradle) - WorkManager での1時間毎のバックグラウンド通知の基本構成例</div>
+                        <pre class="text-emerald-400">val hourlyNotificationWork = PeriodicWorkRequestBuilder&lt;HourlyNotificationWorker&gt;(
+    1, TimeUnit.HOURS
+).build()
+
+WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+    "HourlyNotifierTask",
+    ExistingPeriodicWorkPolicy.KEEP,
+    hourlyNotificationWork
+)</pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- パスワード変更モーダルダイアログ -->
+    <div id="password-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-6">
+            <h3 class="text-base font-bold mb-4">管理パスワードの変更</h3>
+            <form onsubmit="saveNewPassword(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">現在のパスワード</label>
+                    <input type="password" id="current-pass-input" required class="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">新しいパスワード</label>
+                    <input type="password" id="new-pass-input" required class="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closePasswordResetModal()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800">キャンセル</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-xl bg-brand-600 text-white">設定保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // アプリケーション状態の管理
+        const DEFAULT_PASS = "admin123";
+        let state = {
+            isAuthenticated: false,
+            masterEnabled: true,
+            password: DEFAULT_PASS,
+            schedule: {
+                start: "09:00",
+                end: "21:00",
+                days: [0, 1, 2, 3, 4, 5, 6], // 日〜土
+                quietHours: true
+            },
+            template: {
+                title: "【時報】{time} のお知らせ",
+                body: "現在 {time} です。適度な水分補給や姿勢チェックを行いましょう！",
+                sound: "chime",
+                category: "健康・リフレッシュ"
+            },
+            logs: []
+        };
+
+        const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+
+        // 初期化処理
+        window.onload = function() {
+            lucide.createIcons();
+            loadState();
+            renderDaysSelector();
+            updatePhonePreview();
+            startHourlyScheduler();
+            updateMockClock();
+            setInterval(updateMockClock, 1000);
+        };
+
+        // ローカルストレージとの同期
+        function loadState() {
+            const saved = localStorage.getItem('hourly_notifier_state');
+            if (saved) {
+                try {
+                    state = { ...state, ...JSON.parse(saved) };
+                } catch(e) { console.error("設定読み込みエラー", e); }
+            }
+            
+            // UI状態の復元
+            document.getElementById('master-toggle').checked = state.masterEnabled;
+            document.getElementById('schedule-start').value = state.schedule.start;
+            document.getElementById('schedule-end').value = state.schedule.end;
+            document.getElementById('quiet-hours-toggle').checked = state.schedule.quietHours;
+            document.getElementById('msg-title').value = state.template.title;
+            document.getElementById('msg-body').value = state.template.body;
+            document.getElementById('sound-select').value = state.template.sound;
+            document.getElementById('category-select').value = state.template.category;
+
+            renderLogs();
+        }
+
+        function saveState() {
+            localStorage.setItem('hourly_notifier_state', JSON.stringify(state));
+        }
+
+        // ログイン処理
+        function handleLogin(e) {
+            e.preventDefault();
+            const inputPass = document.getElementById('auth-password').value;
+            if (inputPass === state.password) {
+                state.isAuthenticated = true;
+                document.getElementById('auth-modal').classList.add('hidden');
+                document.getElementById('main-dashboard').classList.remove('hidden');
+                showToast('ログインしました', 'success');
+            } else {
+                document.getElementById('auth-error').classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            state.isAuthenticated = false;
+            document.getElementById('auth-password').value = '';
+            document.getElementById('auth-error').classList.add('hidden');
+            document.getElementById('main-dashboard').classList.add('hidden');
+            document.getElementById('auth-modal').classList.remove('hidden');
+            showToast('ログアウトしました', 'info');
+        }
+
+        function togglePasswordVisibility(fieldId, iconId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            if (field.type === "password") {
+                field.type = "text";
+                icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                field.type = "password";
+                icon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        // タブ切り替え処理
+        function switchTab(tabName) {
+            document.getElementById('tab-dashboard').classList.add('hidden');
+            document.getElementById('tab-guide').classList.add('hidden');
+            
+            document.getElementById('nav-dashboard').classList.remove('bg-brand-500/10', 'text-brand-600', 'dark:text-brand-400');
+            document.getElementById('nav-guide').classList.remove('bg-brand-500/10', 'text-brand-600', 'dark:text-brand-400');
+
+            if (tabName === 'dashboard') {
+                document.getElementById('tab-dashboard').classList.remove('hidden');
+                document.getElementById('nav-dashboard').classList.add('bg-brand-500/10', 'text-brand-600', 'dark:text-brand-400');
+            } else if (tabName === 'guide') {
+                document.getElementById('tab-guide').classList.remove('hidden');
+                document.getElementById('nav-guide').classList.add('bg-brand-500/10', 'text-brand-600', 'dark:text-brand-400');
+            }
+        }
+
+        // 曜日選択ボタンの描画
+        function renderDaysSelector() {
+            const container = document.getElementById('days-selector');
+            container.innerHTML = '';
+            dayNames.forEach((day, idx) => {
+                const isActive = state.schedule.days.includes(idx);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `w-9 h-9 rounded-xl font-bold text-xs transition ${
+                    isActive 
+                        ? 'bg-brand-600 text-white shadow-md shadow-brand-500/30' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600'
+                }`;
+                btn.innerText = day;
+                btn.onclick = () => toggleDay(idx);
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleDay(dayIndex) {
+            const index = state.schedule.days.indexOf(dayIndex);
+            if (index > -1) {
+                state.schedule.days.splice(index, 1);
+            } else {
+                state.schedule.days.push(dayIndex);
+            }
+            renderDaysSelector();
+            saveState();
+        }
+
+        // マスタートグル切り替え
+        function toggleMasterNotify(checked) {
+            state.masterEnabled = checked;
+            const statusPill = document.getElementById('system-status-pill');
+            
+            if (checked) {
+                statusPill.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-semibold border border-emerald-500/20";
+                statusPill.innerText = "稼働中";
+                showToast("1時間毎の自動通知を有効にしました", "success");
+            } else {
+                statusPill.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-semibold border border-amber-500/20";
+                statusPill.innerText = "停止中";
+                showToast("1時間毎の自動通知を停止しました", "warning");
+            }
+            saveState();
+        }
+
+        // スケジュール設定保存
+        function saveScheduleSettings() {
+            state.schedule.start = document.getElementById('schedule-start').value;
+            state.schedule.end = document.getElementById('schedule-end').value;
+            state.schedule.quietHours = document.getElementById('quiet-hours-toggle').checked;
+            saveState();
+            showToast("スケジュール設定を更新しました", "success");
+        }
+
+        // スマホプレビュー更新
+        function updatePhonePreview() {
+            const titleInput = document.getElementById('msg-title').value;
+            const bodyInput = document.getElementById('msg-body').value;
+            const categoryInput = document.getElementById('category-select').value;
+
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:00`;
+
+            const parsedTitle = titleInput.replace('{time}', timeStr);
+            const parsedBody = bodyInput.replace('{time}', timeStr);
+
+            document.getElementById('preview-title-text').innerText = parsedTitle;
+            document.getElementById('preview-body-text').innerText = parsedBody;
+            document.getElementById('preview-category-tag').innerText = categoryInput;
+
+            state.template.title = titleInput;
+            state.template.body = bodyInput;
+            state.template.sound = document.getElementById('sound-select').value;
+            state.template.category = categoryInput;
+            saveState();
+        }
+
+        function updateMockClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('preview-phone-time').innerText = `${hours}:${minutes}`;
+            
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const dayName = dayNames[now.getDay()];
+            document.getElementById('preview-phone-date').innerText = `${month}月${date}日 ${dayName}曜日`;
+        }
+
+        // Web Notifications リクエスト
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                showToast("ご利用のブラウザはWeb通知に対応していません", "error");
+                return;
+            }
+
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    showToast("通知が許可されました！実機への試聴テストが可能です。", "success");
+                    document.getElementById('btn-request-permission').innerText = "許可済み";
+                    document.getElementById('btn-request-permission').classList.replace('bg-brand-600', 'bg-emerald-600');
+                } else if (permission === "denied") {
+                    showToast("通知が拒否されています。ブラウザ設定より許可を有効にしてください。", "error");
+                }
+            });
+        }
+
+        // 即時テスト送信
+        function triggerImmediateNotification() {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            const title = state.template.title.replace('{time}', timeStr);
+            const body = state.template.body.replace('{time}', timeStr);
+
+            // 1. 効果音再生
+            playNotificationSound(state.template.sound);
+
+            // 2. ブラウザ通知発行
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(title, {
+                    body: body,
+                    tag: 'hourly-notifier'
+                });
+            }
+
+            // 3. ログの保存
+            addLogEntry('テスト送信', title, '成功');
+            showToast("テスト通知を発行しました", "info");
+
+            // 4. スマホシミュレータのアニメーション強調
+            const card = document.getElementById('preview-notification-card');
+            card.classList.add('scale-105', 'ring-2', 'ring-brand-500');
+            setTimeout(() => card.classList.remove('scale-105', 'ring-2', 'ring-brand-500'), 500);
+        }
+
+        // Web Audio API による合成通知音再生
+        function playNotificationSound(type) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'chime') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.3); // E5
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.6);
+                } else if (type === 'digital') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.2);
+                } else { // soft bell
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 1.0);
+                }
+            } catch(e) {
+                console.log('音声再生がスキップされました', e);
+            }
+        }
+
+        // 1時間毎の背景チェックループ
+        function startHourlyScheduler() {
+            setInterval(() => {
+                const now = new Date();
+                // 毎時00分00秒のタイミングを判定
+                if (now.getMinutes() === 0 && now.getSeconds() === 0) {
+                    executeHourlyCheck(now);
+                }
+            }, 1000);
+        }
+
+        function executeHourlyCheck(now) {
+            if (!state.masterEnabled) return;
+
+            const currentDay = now.getDay();
+            if (!state.schedule.days.includes(currentDay)) return;
+
+            const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:00`;
+            if (currentTimeStr < state.schedule.start || currentTimeStr > state.schedule.end) return;
+
+            // 定時通知の実行
+            const title = state.template.title.replace('{time}', currentTimeStr);
+            const body = state.template.body.replace('{time}', currentTimeStr);
+
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification(title, { body: body, tag: 'hourly-notifier' });
+            }
+            
+            playNotificationSound(state.template.sound);
+            addLogEntry('1時間定期配信', title, '成功');
+        }
+
+        // ログの登録と描画
+        function addLogEntry(type, title, status) {
+            const now = new Date();
+            const timeString = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            
+            const logItem = { type, title, status, time: timeString };
+            state.logs.unshift(logItem);
+            if (state.logs.length > 30) state.logs.pop(); // 直近30件を保持
+            saveState();
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            if (state.logs.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-400 py-8">送信履歴はありません</div>`;
+                return;
+            }
+
+            container.innerHTML = state.logs.map(log => `
+                <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full ${log.status === '成功' ? 'bg-emerald-500' : 'bg-red-500'}"></span>
+                        <div>
+                            <p class="font-medium text-slate-800 dark:text-slate-200 line-clamp-1">${log.title}</p>
+                            <span class="text-[10px] text-slate-400">${log.type}</span>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400 shrink-0">${log.time}</span>
+                </div>
+            `).join('');
+        }
+
+        function clearNotificationLogs() {
+            state.logs = [];
+            saveState();
+            renderLogs();
+            showToast("ログを消去しました", "info");
+        }
+
+        // パスワード変更処理
+        function openPasswordResetModal() {
+            document.getElementById('password-modal').classList.remove('hidden');
+        }
+
+        function closePasswordResetModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+        }
+
+        function saveNewPassword(e) {
+            e.preventDefault();
+            const current = document.getElementById('current-pass-input').value;
+            const newPass = document.getElementById('new-pass-input').value;
+
+            if (current !== state.password) {
+                showToast("現在のパスワードが一致しません", "error");
+                return;
+            }
+
+            state.password = newPass;
+            saveState();
+            closePasswordResetModal();
+            showToast("パスワードを変更しました", "success");
+        }
+
+        // トースト通知表示処理
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-slate-900 text-white";
+            if (type === 'success') bgClass = "bg-emerald-600 text-white";
+            if (type === 'error') bgClass = "bg-red-600 text-white";
+            if (type === 'warning') bgClass = "bg-amber-600 text-white";
+
+            toast.className = `${bgClass} px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 transition duration-300 transform translate-y-2 opacity-0`;
+            toast.innerText = message;
+
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ダークモード切り替え
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+    </script>
+</body>
+</html>
