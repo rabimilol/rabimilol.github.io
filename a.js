@@ -1,15 +1,14 @@
-javascript:(function(){
-    if (window._robloxAudioPatched) {
-        alert("Audio patch is already active.");
-        return;
-    }
+// Roblox AudioWorklet Fix Patch
+if (window._robloxAudioPatched) {
+    alert("Audio patch is already active.");
+} else {
     window._robloxAudioPatched = true;
 
     // AudioWorkletのグローバル登録やメッセージ処理の型不整合をフック
     const origRegister = window.registerProcessor;
     window.registerProcessor = function(name, processorCtor) {
         try {
-            // プロストラクタの安全性を確保するためのラッパー処理
+            // プロセッサの安全性を確保するためのラッパー処理
             class SafeAudioProcessor extends processorCtor {
                 constructor(options) {
                     super(options || {});
@@ -33,4 +32,4 @@ javascript:(function(){
 
     console.log("[Patched] Roblox AudioWorklet hook installed successfully.");
     alert("Robloxオーディオパッチを適用しました。ゲーム画面を再読み込みしてください。");
-})();
+}
